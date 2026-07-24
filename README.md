@@ -41,29 +41,29 @@
 ```mermaid
 flowchart TD
     subgraph Encoder ["RhizoUNet Encoder"]
-        In[Input Image 128x128x3] --> C1[Conv3x3 + ELU: 64 ch]
-        C1 --> P1[AvgPool2d 2x2: 64x64]
-        P1 --> C2[ConvBlock + ResSkip: 128 ch]
-        C2 --> P2[AvgPool2d 2x2: 32x32]
-        P2 --> C3[ConvBlock + ResSkip: 256 ch]
-        C3 --> P3[AvgPool2d 2x2: 16x16]
+        In["Input Image: 128x128x3"] --> C1["Conv3x3 + ELU: 64 channels"]
+        C1 --> P1["AvgPool2d 2x2: 64x64"]
+        P1 --> C2["ConvBlock + ResSkip: 128 channels"]
+        C2 --> P2["AvgPool2d 2x2: 32x32"]
+        P2 --> C3["ConvBlock + ResSkip: 256 channels"]
+        C3 --> P3["AvgPool2d 2x2: 16x16"]
     end
 
     subgraph Bottleneck ["Bridge Bottleneck"]
-        P3 --> BN[ConvBlock + ELU + Dropout 0.2: 512 ch]
+        P3 --> BN["ConvBlock + ELU + Dropout 0.2: 512 channels"]
     end
 
     subgraph Decoder ["RhizoUNet Decoder"]
-        BN --> UP1[Bilinear Upsample 2x2: 256 ch]
-        UP1 & C3 --> CAT1[Concat Skip: 512 ch]
-        CAT1 --> DC1[ConvBlock + ELU: 256 ch]
-        DC1 --> UP2[Bilinear Upsample 2x2: 128 ch]
-        UP2 & C2 --> CAT2[Concat Skip: 256 ch]
-        CAT2 --> DC2[ConvBlock + ELU: 128 ch]
-        DC2 --> UP3[Bilinear Upsample 2x2: 64 ch]
-        UP3 & C1 --> CAT3[Concat Skip: 128 ch]
-        CAT3 --> DC3[ConvBlock + ELU: 64 ch]
-        DC3 --> HEAD[1x1 Conv Out: 1 ch Logits]
+        BN --> UP1["Bilinear Upsample 2x2: 256 channels"]
+        UP1 & C3 --> CAT1["Concat Skip Connection: 512 channels"]
+        CAT1 --> DC1["ConvBlock + ELU: 256 channels"]
+        DC1 --> UP2["Bilinear Upsample 2x2: 128 channels"]
+        UP2 & C2 --> CAT2["Concat Skip Connection: 256 channels"]
+        CAT2 --> DC2["ConvBlock + ELU: 128 channels"]
+        DC2 --> UP3["Bilinear Upsample 2x2: 64 channels"]
+        UP3 & C1 --> CAT3["Concat Skip Connection: 128 channels"]
+        CAT3 --> DC3["ConvBlock + ELU: 64 channels"]
+        DC3 --> HEAD["1x1 Conv Head: 1 channel Logits"]
     end
 ```
 
@@ -75,42 +75,42 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    In[Input RGB Image 128x128] --> MSRFP[Multi-Scale Receptive Field Pyramid\nConvs 3x3, 5x5, 7x7 Dilated]
-    MSRFP --> Enc[Deep Residual Feature Extractor]
-    Enc --> OTAM[Oriented Topological Attention Module]
+    In["Input RGB Image: 128x128"] --> MSRFP["Multi-Scale Receptive Field Pyramid: Convs 3x3, 5x5, 7x7 Dilated"]
+    MSRFP --> Enc["Deep Residual Feature Extractor"]
+    Enc --> OTAM["Oriented Topological Attention Module"]
     
     subgraph OTAM_Detail ["OTAM Directional Gating"]
-        OTAM --> A0[0° Horizontal Filter]
-        OTAM --> A45[45° Diagonal Filter]
-        OTAM --> A90[90° Vertical Filter]
-        OTAM --> A135[135° Anti-Diagonal Filter]
-        A0 & A45 & A90 & A135 --> SoftmaxGate[Spatial Softmax Gating]
+        OTAM --> A0["0 Degree Horizontal Filter"]
+        OTAM --> A45["45 Degree Diagonal Filter"]
+        OTAM --> A90["90 Degree Vertical Filter"]
+        OTAM --> A135["135 Degree Anti-Diagonal Filter"]
+        A0 & A45 & A90 & A135 --> SoftmaxGate["Spatial Softmax Gating"]
     end
 
-    SoftmaxGate --> GatedFeat[Gated Feature Fusion]
-    GatedFeat --> Dec[Deep Supervision Decoder]
-    Dec --> Head1[Auxiliary Out Head 1]
-    Dec --> Head2[Auxiliary Out Head 2]
-    Dec --> Final[Final 1x1 Conv Mask: 97.9% IoU]
+    SoftmaxGate --> GatedFeat["Gated Feature Fusion"]
+    GatedFeat --> Dec["Deep Supervision Decoder"]
+    Dec --> Head1["Auxiliary Out Head 1"]
+    Dec --> Head2["Auxiliary Out Head 2"]
+    Dec --> Final["Final 1x1 Conv Mask: 97.9% IoU"]
 ```
 
 ---
 
 ## 3. DualStreamRootNet (Hessian Dual Stream)
 
-`DualStreamRootNet` combines a standard spatial RGB convolutional encoder stream with a dedicated Frangi Hessian vesselness filter matrix stream ($\mathbf{H} = \begin{bmatrix} I_{xx} & I_{xy} \\ I_{yx} & I_{yy} \end{bmatrix}$) to detect tubular root structures in dense soil background.
+`DualStreamRootNet` combines a standard spatial RGB convolutional encoder stream with a dedicated Frangi Hessian vesselness filter matrix stream to detect tubular root structures in dense soil background.
 
 ```mermaid
 flowchart TD
-    In[Input Image 128x128] --> Stream1[Spatial RGB Stream\n4-Level Conv Encoder]
-    In --> HessianFilter[Multi-Scale Frangi Hessian Filter\nCompute Eigenvalues λ1, λ2]
-    HessianFilter --> VesselnessMap[Tubular Vesselness Response Map]
-    VesselnessMap --> Stream2[Hessian Tube Stream\n3-Level Conv Encoder]
+    In["Input Image: 128x128"] --> Stream1["Spatial RGB Stream: 4-Level Conv Encoder"]
+    In --> HessianFilter["Multi-Scale Frangi Hessian Filter: Eigenvalues L1 and L2"]
+    HessianFilter --> VesselnessMap["Tubular Vesselness Response Map"]
+    VesselnessMap --> Stream2["Hessian Tube Stream: 3-Level Conv Encoder"]
     
-    Stream1 & Stream2 --> FusionGate[Cross-Stream Adaptive Fusion Gate\nAlpha * Spatial + (1-Alpha) * Hessian]
-    FusionGate --> JointDecoder[Joint Feature Decoder]
-    JointDecoder --> HeadMask[Primary Root Mask Head]
-    JointDecoder --> HeadCenterline[Centerline Skeleton Head]
+    Stream1 & Stream2 --> FusionGate["Cross-Stream Adaptive Fusion Gate: Alpha * Spatial + 1-Alpha * Hessian"]
+    FusionGate --> JointDecoder["Joint Feature Decoder"]
+    JointDecoder --> HeadMask["Primary Root Mask Head"]
+    JointDecoder --> HeadCenterline["Centerline Skeleton Head"]
 ```
 
 ---
@@ -121,16 +121,16 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    In[Input Image 128x128] --> PatchEmbed[Patch Embedding\nPatch Size 4x4 -> 32x32 Tokens]
-    PatchEmbed --> SwinStage1[Swin Block 1: W-MSA\nLocal Window Attention]
-    SwinStage1 --> SwinStage2[Swin Block 2: SW-MSA\nShifted Window Attention]
+    In["Input Image: 128x128"] --> PatchEmbed["Patch Embedding: Patch Size 4x4 to 32x32 Tokens"]
+    PatchEmbed --> SwinStage1["Swin Block 1: Window Self-Attention W-MSA"]
+    SwinStage1 --> SwinStage2["Swin Block 2: Shifted Window Attention SW-MSA"]
     
-    subgraph RQT ["Root Query Tokens (RQT)"]
-        SwinStage2 --> RQT_Module[Root Query Cross-Attention\nLearned Query Embeddings for Root Junctions]
+    subgraph RQT ["Root Query Tokens RQT"]
+        SwinStage2 --> RQT_Module["Root Query Cross-Attention: Learned Tokens for Root Junctions"]
     end
 
-    RQT_Module --> LightDecoder[Lightweight Up-Projection Decoder]
-    LightDecoder --> Head[1x1 Out Conv: 1.8 ms Latency]
+    RQT_Module --> LightDecoder["Lightweight Up-Projection Decoder"]
+    LightDecoder --> Head["1x1 Out Conv Head: 1.8 ms Latency"]
 ```
 
 ---
@@ -141,15 +141,15 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    NodeFeat[Node Coordinates & Degrees [N, 8]] --> NodeProj[Linear Node Feature Projection]
-    GraphLaplacian[Graph Laplacian L = D - A] --> Eigen[Eigenvalue Decomposition\nSmallest Non-Trivial Eigenvectors]
-    Eigen --> LPE[Laplacian Positional Encoding [N, k]]
+    NodeFeat["Node Coordinates and Degrees: N x 8"] --> NodeProj["Linear Node Feature Projection"]
+    GraphLaplacian["Graph Laplacian Matrix: L = D - A"] --> Eigen["Eigenvalue Decomposition: Smallest Non-Trivial Eigenvectors"]
+    Eigen --> LPE["Laplacian Positional Encoding: N x k"]
     
-    NodeProj & LPE --> ConcatEmbed[Combined Node Representation]
-    ConcatEmbed --> GTLayer1[Graph Transformer Layer 1\nNode-Edge Attention]
-    GTLayer1 --> GTLayer2[Graph Transformer Layer 2\nResidual LayerNorm + FFN]
-    GTLayer2 --> GlobalPool[Global Mean + Max Pooling]
-    GlobalPool --> TopoVector[128-d Global Topological Vector]
+    NodeProj & LPE --> ConcatEmbed["Combined Node Representation"]
+    ConcatEmbed --> GTLayer1["Graph Transformer Layer 1: Node-Edge Attention"]
+    GTLayer1 --> GTLayer2["Graph Transformer Layer 2: Residual LayerNorm + FFN"]
+    GTLayer2 --> GlobalPool["Global Mean + Max Pooling"]
+    GlobalPool --> TopoVector["128-d Global Topological Vector"]
 ```
 
 ---
